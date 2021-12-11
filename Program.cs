@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -14,8 +14,8 @@ namespace gogogo
             if (args != null && args.Length > 0)
             {
                 int port;
-                int.TryParse(args[0], out port);
-                return port;
+                if (int.TryParse(args[0], out port))
+                    return port;
             }
             return 52222;
         }
@@ -213,7 +213,7 @@ namespace gogogo
                         if (size > 0)
                         {
                             this.clientBufferSize = size;
-                            this.ProxySendClient(clientBuffer);
+                            this.ProxySendToClient(clientBuffer);
                             this.clientSocket.BeginReceive(clientBuffer, 0, clientBuffer.Length, SocketFlags.None, this._OnClientReceive, null);
                         }
                         else
@@ -261,10 +261,7 @@ namespace gogogo
                 {
                     if (clientSocket.Poll(TIMEOUT, SelectMode.SelectWrite))
                     {
-                        clientSocket.BeginSend(buffer, 0, proxyBufferSize, SocketFlags.None, (ir) =>
-                        {
-                            clientSocket.EndSend(ir);
-                        }, null);
+                        clientSocket.Send(buffer, 0, proxyBufferSize, SocketFlags.None);
                     }
                 }
                 catch (Exception ex)
@@ -274,16 +271,13 @@ namespace gogogo
                 }
             }
 
-            private void ProxySendClient(byte[] buffer)
+            private void ProxySendToClient(byte[] buffer)
             {
                 try
                 {
                     if (proxySocket.Poll(TIMEOUT, SelectMode.SelectWrite))
                     {
-                        proxySocket.BeginSend(buffer, 0, clientBufferSize, SocketFlags.None, (ir) =>
-                        {
-                            proxySocket.EndSend(ir);
-                        }, null);
+                        proxySocket.Send(buffer, 0, clientBufferSize, SocketFlags.None);
                     }
                 }
                 catch (Exception ex)
@@ -495,7 +489,6 @@ namespace gogogo
             try { socket.Disconnect(false); } catch (Exception ex) { }
             try { socket.Shutdown(SocketShutdown.Both); } catch (Exception ex) { }
             try { socket.Dispose(); } catch (Exception ex) { }
-
         }
     }
 }
