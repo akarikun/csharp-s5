@@ -5,29 +5,30 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace gogogo
+namespace csharp_s5
 {
     class Program
     {
-        static int PortDefault(string[] args)
+        static int Default_IValue(string[] args, int index, int def_val)
         {
-            if (args != null && args.Length > 0)
+            if (args != null && args.Length > index)
             {
-                int port;
-                if (int.TryParse(args[0], out port))
-                    return port;
+                int value;
+                if (int.TryParse(args[index], out value))
+                    return value;
             }
-            return 52222;
+            return def_val;
         }
         static void Main(string[] args)
         {
 #if DEBUG
-            args = new string[] { "52222"
-                //, "admin", "123456" 
+            args = new string[] {
+                "52222", "admin", "123456" ,"10"
             };
 #endif
-            ///gogogo [52222] [?username] [?password]
-            var port = PortDefault(args);
+            ///gogogo [52222] [?username] [?password] [?backlog]
+            var port = Default_IValue(args, 0, 52222);
+            var backlog = Default_IValue(args, 3, 3);
             Console.Title = port.ToString();
             Console.WriteLine("gogogo Listen {0}", port);
             var s = new S5Server();
@@ -46,14 +47,14 @@ namespace gogogo
             };
             s.Message = (msg) =>
             {
-                Console.WriteLine(msg);
+                Console.WriteLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "|" + msg);
             };
             s.Traffic = (upload, download, uploadTotal, downloadTotal) =>
             {
                 var u = uploadTotal / 1024.0 / 1024;//MB
                 var d = downloadTotal / 1024.0 / 1024;//MB               
                 Console.Title = string.Format("{0} | ↑:{1}MB  ↓:{2}MB", port,
-                    string.Format("{0:N2}", u), string.Format("{0:N2}", d));
+                   string.Format("{0:N2}", u), string.Format("{0:N2}", d));
             };
             var name = "";
             var pwd = "";
@@ -61,10 +62,10 @@ namespace gogogo
             if (args.Length >= 3) { pwd = args[2]; }
             if (!string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(pwd))
             {
-                s.SetAuthor(name, pwd);
+                s.Authorization(name, pwd);
                 Console.WriteLine("{0}/{1}", name, pwd);
             }
-            s.Start("0.0.0.0", port);
+            s.Start("0.0.0.0", port, backlog);
             Console.ReadLine();
         }
     }
@@ -310,16 +311,16 @@ namespace gogogo
         public Action<long, long, long, long> Traffic;
         public string username;
         public string password;
-        public void SetAuthor(string username, string password)
+        public void Authorization(string username, string password)
         {
             this.username = username;
             this.password = password;
         }
-        public void Start(string ip, int port)
+        public void Start(string ip, int port, int backlog = 3)
         {
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             socket.Bind(new IPEndPoint(IPAddress.Parse(ip), port));
-            socket.Listen(3);
+            socket.Listen(backlog);
             socket.BeginAccept(AcceptSocket, socket);
         }
         void AcceptSocket(IAsyncResult result)
@@ -329,8 +330,11 @@ namespace gogogo
             var s5 = new S5Data() { clientSocket = s };
             s5.Message = (msg) => { this.Message?.Invoke(msg); };
             s5.Traffic = (clientBufferTotal, proxyBufferSize) => { this.Traffic?.Invoke(clientBufferTotal, proxyBufferSize, S5Data.clientBufferTotal, S5Data.proxyBufferTotal); };
-            s5.clientBufferSize = s5.clientSocket.Receive(s5.clientBuffer);
-            DoShakeHands(s5);
+            if (s5.clientSocket.Available > 0)//修复小火箭多次点击连通性测试导致服务假死
+            {
+                s5.clientBufferSize = s5.clientSocket.Receive(s5.clientBuffer);
+                DoShakeHands(s5);
+            }
             socket.BeginAccept(AcceptSocket, socket);
         }
         bool ClientRecv(S5Data s5)
