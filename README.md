@@ -16,4 +16,4 @@
 	01 bb是指访问端口号443(处理的时候注意大小尾字节)
 4:只是第二个字节变成0,其他数据与3一致
 ```
-![img.gif](https://raw.githubusercontent.com/akarikun/csharp-s5/main/img.gif)
+![img.gif](https://raw.githubusercontent.com/akarikun/csharp-s5/main/img.png)
